@@ -8,7 +8,7 @@ use log::debug;
 use ratatui::layout::Rect;
 use std::cell::Cell;
 use std::fmt::{Debug, Display, Formatter};
-use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 pub use crate::focus::{handle_focus, handle_mouse_focus, Focus};
 pub use crate::zrect::ZRect;
@@ -36,7 +36,7 @@ pub mod event {
 /// [on_lost!](crate::on_lost!).
 ///
 #[derive(Clone, Default)]
-pub struct FocusFlag(Rc<FocusFlagCore>);
+pub struct FocusFlag(Arc<FocusFlagCore>);
 
 /// The same as FocusFlag, but distinct to mark the focus for
 /// a container.
@@ -48,13 +48,13 @@ pub struct FocusFlag(Rc<FocusFlagCore>);
 ///     itself has the focus).
 /// * identifying the container.
 #[derive(Clone, Default)]
-pub struct ContainerFlag(Rc<FocusFlagCore>);
+pub struct ContainerFlag(Arc<FocusFlagCore>);
 
 /// Equality for FocusFlag means pointer equality of the underlying
 /// Rc using Rc::ptr_eq.
 impl PartialEq for FocusFlag {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
+        Arc::ptr_eq(&self.0, &other.0)
     }
 }
 
@@ -70,7 +70,7 @@ impl Display for FocusFlag {
 /// Rc using Rc::ptr_eq.
 impl PartialEq for ContainerFlag {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
+        Arc::ptr_eq(&self.0, &other.0)
     }
 }
 
@@ -88,19 +88,19 @@ struct FocusFlagCore {
     /// Field name for debugging purposes.
     name: Box<str>,
     /// Focus.
-    focus: Cell<bool>,
+    focus: RwLock<bool>,
     /// This widget just gained the focus. This flag is set by [Focus::handle]
     /// if there is a focus transfer, and will be reset by the next
     /// call to [Focus::handle].
     ///
     /// See [on_gained!](crate::on_gained!)
-    gained: Cell<bool>,
+    gained: RwLock<bool>,
     /// This widget just lost the focus. This flag is set by [Focus::handle]
     /// if there is a focus transfer, and will be reset by the next
     /// call to [Focus::handle].
     ///
     /// See [on_lost!](crate::on_lost!)
-    lost: Cell<bool>,
+    lost: RwLock<bool>,
 }
 
 /// Focus navigation for widgets.
@@ -242,19 +242,19 @@ impl FocusFlag {
 
     /// Create a named flag.
     pub fn named(name: &str) -> Self {
-        Self(Rc::new(FocusFlagCore::named(name)))
+        Self(Arc::new(FocusFlagCore::named(name)))
     }
 
     /// Has the focus.
     #[inline]
     pub fn get(&self) -> bool {
-        self.0.focus.get()
+        *(self.0.focus.read().unwrap())
     }
 
     /// Set the focus.
     #[inline]
     pub fn set(&self, focus: bool) {
-        self.0.focus.set(focus);
+        *(self.0.focus.write().unwrap()) = focus;
     }
 
     /// Get the field-name.
@@ -266,31 +266,31 @@ impl FocusFlag {
     /// Just lost the focus.
     #[inline]
     pub fn lost(&self) -> bool {
-        self.0.lost.get()
+        *(self.0.lost.read().unwrap())
     }
 
     #[inline]
     pub fn set_lost(&self, lost: bool) {
-        self.0.lost.set(lost);
+        *(self.0.lost.write().unwrap()) = lost;
     }
 
     /// Just gained the focus.
     #[inline]
     pub fn gained(&self) -> bool {
-        self.0.gained.get()
+        *(self.0.gained.read().unwrap())
     }
 
     #[inline]
     pub fn set_gained(&self, gained: bool) {
-        self.0.gained.set(gained);
+        *(self.0.gained.write().unwrap()) = gained;
     }
 
     /// Reset all flags to false.
     #[inline]
     pub fn clear(&self) {
-        self.0.focus.set(false);
-        self.0.lost.set(false);
-        self.0.gained.set(false);
+        *(self.0.focus.write().unwrap()) = false;
+        *(self.0.lost.write().unwrap()) = false;
+        *(self.0.gained.write().unwrap()) = false;
     }
 }
 
@@ -302,19 +302,19 @@ impl ContainerFlag {
 
     /// Create a named flag.
     pub fn named(name: &str) -> Self {
-        Self(Rc::new(FocusFlagCore::named(name)))
+        Self(Arc::new(FocusFlagCore::named(name)))
     }
 
     /// Has the focus.
     #[inline]
     pub fn get(&self) -> bool {
-        self.0.focus.get()
+        *(self.0.focus.read().unwrap())
     }
 
     /// Set the focus.
     #[inline]
     pub fn set(&self, focus: bool) {
-        self.0.focus.set(focus);
+        *(self.0.focus.write().unwrap()) = focus;
     }
 
     /// Get the field-name.
@@ -326,41 +326,40 @@ impl ContainerFlag {
     /// Just lost the focus.
     #[inline]
     pub fn lost(&self) -> bool {
-        self.0.lost.get()
+        *(self.0.lost.read().unwrap())
     }
 
     #[inline]
     pub fn set_lost(&self, lost: bool) {
-        self.0.lost.set(lost);
+        *(self.0.lost.write().unwrap()) = lost;
     }
 
     /// Just gained the focus.
     #[inline]
     pub fn gained(&self) -> bool {
-        self.0.gained.get()
+        *(self.0.gained.read().unwrap())
     }
 
     #[inline]
     pub fn set_gained(&self, gained: bool) {
-        self.0.gained.set(gained);
+        *(self.0.gained.write().unwrap()) = gained
     }
 
     /// Reset all flags to false.
     #[inline]
     pub fn clear(&self) {
-        self.0.focus.set(false);
-        self.0.lost.set(false);
-        self.0.gained.set(false);
-    }
+        *(self.0.focus.write().unwrap()) = false;
+        *(self.0.lost.write().unwrap()) = false;
+        *(self.0.gained.write().unwrap()) = false;    }
 }
 
 impl FocusFlagCore {
     pub(crate) fn named(name: &str) -> Self {
         Self {
             name: name.into(),
-            focus: Cell::new(false),
-            gained: Cell::new(false),
-            lost: Cell::new(false),
+            focus: RwLock::new(false),
+            gained: RwLock::new(false),
+            lost: RwLock::new(false),
         }
     }
 }
