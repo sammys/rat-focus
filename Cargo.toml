@@ -47,7 +47,7 @@ ratatui = { version = "0.28" }
 crossterm = "0.28"
 log = "0.4"
 
-rat-event = { version = "0.16", path = "../rat-event" }
+rat-event = { version = "0.16" }
 
 [dev-dependencies]
 fern = "0.6"
